@@ -1,6 +1,8 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+// signup.js
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebaseConfig.js";
 
 const app = initializeApp(firebaseConfig);
@@ -12,6 +14,11 @@ window.signup = async function () {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
+  if (!username || !email || !password) {
+    alert("ユーザー名・メールアドレス・パスワードを入力してください");
+    return;
+  }
+
   try {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
 
@@ -20,8 +27,10 @@ window.signup = async function () {
       email
     });
 
-    window.close(); // ← 新規登録成功したらタブを閉じる
+    // 新規登録成功 → このタブを閉じる
+    window.close();
   } catch (err) {
-    alert(err.message);
+    console.error(err);
+    alert("新規登録に失敗しました: " + err.message);
   }
 };
