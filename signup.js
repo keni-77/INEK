@@ -1,5 +1,4 @@
 // signup.js
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
@@ -15,7 +14,7 @@ window.signup = async function () {
   const password = document.getElementById("password").value;
 
   if (!username || !email || !password) {
-    alert("ユーザー名・メールアドレス・パスワードを入力してください");
+    alert("すべて入力してください");
     return;
   }
 
@@ -27,10 +26,9 @@ window.signup = async function () {
       email
     });
 
-    // 新規登録成功 → このタブを閉じる
     window.close();
   } catch (err) {
     console.error(err);
-    alert("新規登録に失敗しました: " + err.message);
+    alert("登録に失敗しました: " + err.message);
   }
 };
