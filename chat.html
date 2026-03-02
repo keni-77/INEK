@@ -6,15 +6,54 @@
   <link rel="icon" href="favicon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+  <!-- Firebase 初期化（Auth + RealtimeDB） -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+    import { getDatabase, ref, set, update, get, push, onChildAdded }
+      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+    import { firebaseConfig } from "./firebaseConfig.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    // メール → @ID
+    function getUserIdFromEmail(email) {
+      return "@" + email.split("@")[0];
     }
 
+    // ログインチェック & ユーザー登録
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "index.html";
+        return;
+      }
+
+      const uid = getUserIdFromEmail(user.email);
+
+      // 右上に表示
+      document.getElementById("userStatus").textContent =
+        `${user.displayName} でログイン中`;
+
+      // DB にユーザー情報を保存
+      update(ref(db, "users/" + uid), {
+        displayName: user.displayName,
+        email: user.email
+      });
+    });
+
+    // 他の script から使えるように export
+    window.firebaseExports = {
+      auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded
+    };
+  </script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: system-ui, sans-serif;
       background: #fff5fb;
       color: #444;
       height: 100vh;
@@ -22,7 +61,6 @@
       flex-direction: column;
     }
 
-    /* ヘッダー */
     header {
       height: 56px;
       display: flex;
@@ -42,24 +80,58 @@
       cursor: pointer;
     }
 
-    header h1 {
-      font-size: 1.2rem;
-      font-weight: 700;
+    /* 2カラムレイアウト */
+    .layout {
+      display: flex;
+      height: calc(100vh - 56px);
     }
 
-    header .sub {
-      font-size: 0.75rem;
-      opacity: 0.9;
+    /* 左：フレンド一覧 */
+    .sidebar {
+      width: 260px;
+      background: #ffe3f1;
+      border-right: 1px solid #f5c8dd;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
-    /* メインエリア */
-    .chat-wrapper {
+    .sidebar h2 {
+      font-size: 1.1rem;
+      color: #ff7ab8;
+    }
+
+    .search {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #ffb6d9;
+    }
+
+    .friend-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .friend {
+      padding: 10px;
+      background: #fff;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .friend:hover {
+      background: #ffe6f3;
+    }
+
+    /* 右：チャット画面 */
+    .chat-area {
       flex: 1;
       display: flex;
       flex-direction: column;
       padding: 12px;
       gap: 8px;
-      overflow: hidden;
     }
 
     .messages {
@@ -71,22 +143,8 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
 
-    .empty-hint {
-      text-align: center;
-      margin-top: 40px;
-      font-size: 0.9rem;
-      color: #999;
-    }
-
-    /* メッセージ */
-    .message-row {
-      display: flex;
-      margin-bottom: 10px;
-    }
-
-    .message-row.me {
-      justify-content: flex-end;
-    }
+    .message-row { display: flex; margin-bottom: 10px; }
+    .message-row.me { justify-content: flex-end; }
 
     .bubble {
       max-width: 75%;
@@ -94,33 +152,12 @@
       border-radius: 14px;
       font-size: 0.9rem;
       line-height: 1.4;
-      word-wrap: break-word;
       white-space: pre-wrap;
     }
 
-    .bubble.me {
-      background: #ff9ecb;
-      color: #fff;
-      border-bottom-right-radius: 2px;
-    }
+    .bubble.me { background: #ff9ecb; color: #fff; }
+    .bubble.other { background: #f3f3f3; color: #444; }
 
-    .bubble.other {
-      background: #f3f3f3;
-      color: #444;
-      border-bottom-left-radius: 2px;
-    }
-
-    .meta {
-      font-size: 0.7rem;
-      color: #aaa;
-      margin-top: 2px;
-    }
-
-    .meta.me {
-      text-align: right;
-    }
-
-    /* 入力エリア */
     .input-area {
       display: flex;
       gap: 8px;
@@ -134,42 +171,19 @@
       padding: 10px 12px;
       border-radius: 999px;
       border: 1px solid #e3c7d7;
-      font-size: 0.95rem;
-      outline: none;
-      background: #ffffff;
-    }
-
-    .input-area input:focus {
-      border-color: #ff9ecb;
-      box-shadow: 0 0 0 2px rgba(255,158,203,0.25);
     }
 
     .input-area button {
       border: none;
       border-radius: 999px;
       padding: 0 18px;
-      background: linear-gradient(135deg, #ffb3d9, #ff7ab8);
+      background: #ff7ab8;
       color: #fff;
       font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      box-shadow: 0 3px 8px rgba(255,122,184,0.35);
-      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
-      white-space: nowrap;
-    }
-
-    .input-area button:disabled {
-      opacity: 0.5;
-      box-shadow: none;
-      cursor: default;
-    }
-
-    .input-area button:not(:disabled):active {
-      transform: translateY(1px);
-      box-shadow: 0 1px 4px rgba(255,122,184,0.3);
     }
   </style>
 </head>
+
 <body>
 
   <header>
@@ -178,101 +192,162 @@
       <h1>INEK Chat</h1>
       <div class="sub">つながる、関わる、続ける。</div>
     </div>
-    <div id="userStatus" style="
-      margin-left:auto;
-      font-size:0.8rem;
-      opacity:0.9;
-    "></div>
+    <div id="userStatus" style="margin-left:auto; font-size:0.8rem;"></div>
   </header>
 
-  <main class="chat-wrapper">
-    <div id="messages" class="messages">
-      <div class="empty-hint">まだメッセージはありません。<br>下の入力欄から話しかけてみてね。</div>
-    </div>
+  <main class="layout">
 
-    <div class="input-area">
-      <input
-        id="messageInput"
-        type="text"
-        placeholder="メッセージを入力..."
-        autocomplete="off"
-      >
-      <button id="sendBtn" onclick="sendMessage()">送信</button>
-    </div>
+    <!-- 左：フレンド一覧 -->
+    <aside class="sidebar">
+      <h2>フレンド一覧</h2>
+
+      <input id="friendSearch" class="search" placeholder="フレンド検索…">
+
+      <div id="searchResults" class="friend-list"></div>
+
+      <h2 style="margin-top:10px;">あなたのフレンド</h2>
+      <div id="friendList" class="friend-list"></div>
+    </aside>
+
+    <!-- 右：チャット画面 -->
+    <section class="chat-area">
+      <div id="messages" class="messages"></div>
+
+      <div class="input-area">
+        <input id="messageInput" placeholder="メッセージを入力…">
+        <button onclick="sendMessage()">送信</button>
+      </div>
+    </section>
+
   </main>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
-  import { firebaseConfig } from "./firebaseConfig.js";
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-
-  // ログインしていない場合は index.html に強制移動
-  onAuthStateChanged(auth, user => {
-    if (!user) {
-      window.location.href = "index.html";
-    } else {
-      // ログインしているなら右上に表示
-      document.getElementById("userStatus").textContent = `${user.displayName} でログイン中`;
-    }
-  });
-</script>
+  <!-- フレンド検索・チャット処理 -->
   <script>
-    const messagesEl = document.getElementById("messages");
-    const inputEl = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
+    const { auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded } =
+      window.firebaseExports;
+
+    let currentRoomId = null;
 
     function goHome() {
       window.location.href = "index.html";
     }
 
-    function appendMessage(text, who = "me") {
-      const emptyHint = messagesEl.querySelector(".empty-hint");
-      if (emptyHint) emptyHint.remove();
+    // フレンド検索
+    document.getElementById("friendSearch").addEventListener("input", async (e) => {
+      const keyword = e.target.value.replace("@", "");
+      if (!keyword) return;
+
+      const snap = await get(ref(db, "users"));
+      const results = [];
+
+      snap.forEach(child => {
+        const uid = child.key;
+        if (uid.includes(keyword)) results.push(uid);
+      });
+
+      displaySearchResults(results);
+    });
+
+    function displaySearchResults(list) {
+      const box = document.getElementById("searchResults");
+      box.innerHTML = "";
+
+      list.forEach(uid => {
+        const div = document.createElement("div");
+        div.className = "friend";
+        div.textContent = uid;
+        div.onclick = () => addFriend(uid);
+        box.appendChild(div);
+      });
+    }
+
+    // フレンド追加
+    async function addFriend(friendId) {
+      const me = getUserIdFromEmail(auth.currentUser.email);
+
+      await update(ref(db, `users/${me}/friends`), {
+        [friendId]: true
+      });
+
+      alert(`${friendId} をフレンドに追加しました！`);
+      loadFriendList();
+    }
+
+    // フレンド一覧読み込み
+    async function loadFriendList() {
+      const me = getUserIdFromEmail(auth.currentUser.email);
+      const snap = await get(ref(db, `users/${me}/friends`));
+
+      const box = document.getElementById("friendList");
+      box.innerHTML = "";
+
+      if (!snap.exists()) return;
+
+      const friends = snap.val();
+      Object.keys(friends).forEach(uid => {
+        const div = document.createElement("div");
+        div.className = "friend";
+        div.textContent = uid;
+        div.onclick = () => openChatWith(uid);
+        box.appendChild(div);
+      });
+    }
+
+    // チャットルームを開く
+    function openChatWith(friendId) {
+      const me = getUserIdFromEmail(auth.currentUser.email);
+      currentRoomId = [me, friendId].sort().join("_");
+
+      document.getElementById("messages").innerHTML = "";
+      loadMessages(currentRoomId);
+    }
+
+    // メッセージ受信
+    function loadMessages(roomId) {
+      const messagesRef = ref(db, `rooms/${roomId}/messages`);
+
+      onChildAdded(messagesRef, (snap) => {
+        const msg = snap.val();
+        appendMessage(msg.text, msg.sender === getUserIdFromEmail(auth.currentUser.email) ? "me" : "other");
+      });
+    }
+
+    // メッセージ表示
+    function appendMessage(text, who) {
+      const box = document.getElementById("messages");
 
       const row = document.createElement("div");
       row.className = `message-row ${who}`;
 
       const bubble = document.createElement("div");
-      bubble.className = `bubble ${who === "me" ? "me" : "other"}`;
+      bubble.className = `bubble ${who}`;
       bubble.textContent = text;
 
-      const meta = document.createElement("div");
-      meta.className = `meta ${who === "me" ? "me" : ""}`;
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, "0");
-      const mm = String(now.getMinutes()).padStart(2, "0");
-      meta.textContent = `${who === "me" ? "あなた" : "INEK" }・${hh}:${mm}`;
-
       row.appendChild(bubble);
-      row.appendChild(meta);
-      messagesEl.appendChild(row);
+      box.appendChild(row);
 
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      box.scrollTop = box.scrollHeight;
     }
 
-    function sendMessage() {
-      const text = inputEl.value.trim();
-      if (!text) return;
+    // メッセージ送信
+    async function sendMessage() {
+      const text = document.getElementById("messageInput").value.trim();
+      if (!text || !currentRoomId) return;
 
-      appendMessage(text, "me");
-      inputEl.value = "";
-      inputEl.focus();
+      const me = getUserIdFromEmail(auth.currentUser.email);
 
-      // 仮の返信
-      setTimeout(() => {
-        appendMessage("まだ本物のチャットは未実装だよ。\nこれから一緒に作っていこう。", "other");
-      }, 500);
+      const msgRef = push(ref(db, `rooms/${currentRoomId}/messages`));
+      await set(msgRef, {
+        sender: me,
+        text,
+        timestamp: Date.now()
+      });
+
+      document.getElementById("messageInput").value = "";
     }
 
-    inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
+    // 初期化
+    setTimeout(loadFriendList, 1000);
   </script>
 
 </body>
