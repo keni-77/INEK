@@ -61,6 +61,8 @@
 
   <!-- ログインボタン -->
   <button class="btn login" onclick="googleLogin()">Googleでログイン</button>
+  <!-- チャットページへ移動 -->
+  <button class="btn chat" onclick="goChat()" style="display:none;">チャットページへ</button>
 
   <!-- ログアウトボタン（最初は非表示） -->
   <button class="btn logout" onclick="logout()">ログアウト</button>
@@ -86,6 +88,11 @@
         });
     };
 
+    // チャットページへ移動
+    window.goChat = function () {
+      window.location.href = "chat.html";
+    };
+
     // ログアウト
     window.logout = function () {
       signOut(auth)
@@ -105,10 +112,12 @@
         statusEl.textContent = `${user.displayName} でログイン中`;
         loginBtn.style.display = "none";
         logoutBtn.style.display = "block";
+        chatBtn.style.display = "block";
       } else {
         statusEl.textContent = "";
         loginBtn.style.display = "block";
         logoutBtn.style.display = "none";
+        chatBtn.style.display = "none";
       }
     });
   </script>
