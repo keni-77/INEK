@@ -3,9 +3,254 @@
 <head>
   <meta charset="UTF-8">
   <title>INEK - Chat</title>
+  <link rel="icon" href="favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff5fb;
+      color: #444;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ヘッダー */
+    header {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      background: #ff9ecb;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    header .back {
+      border: none;
+      background: transparent;
+      color: #fff;
+      font-size: 1.4rem;
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    header .sub {
+      font-size: 0.75rem;
+      opacity: 0.9;
+    }
+
+    /* メインエリア */
+    .chat-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .messages {
+      flex: 1;
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 12px;
+      overflow-y: auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .empty-hint {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 0.9rem;
+      color: #999;
+    }
+
+    /* メッセージ */
+    .message-row {
+      display: flex;
+      margin-bottom: 10px;
+    }
+
+    .message-row.me {
+      justify-content: flex-end;
+    }
+
+    .bubble {
+      max-width: 75%;
+      padding: 8px 12px;
+      border-radius: 14px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    .bubble.me {
+      background: #ff9ecb;
+      color: #fff;
+      border-bottom-right-radius: 2px;
+    }
+
+    .bubble.other {
+      background: #f3f3f3;
+      color: #444;
+      border-bottom-left-radius: 2px;
+    }
+
+    .meta {
+      font-size: 0.7rem;
+      color: #aaa;
+      margin-top: 2px;
+    }
+
+    .meta.me {
+      text-align: right;
+    }
+
+    /* 入力エリア */
+    .input-area {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px 14px;
+      background: #fff5fb;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid #e3c7d7;
+      font-size: 0.95rem;
+      outline: none;
+      background: #ffffff;
+    }
+
+    .input-area input:focus {
+      border-color: #ff9ecb;
+      box-shadow: 0 0 0 2px rgba(255,158,203,0.25);
+    }
+
+    .input-area button {
+      border: none;
+      border-radius: 999px;
+      padding: 0 18px;
+      background: linear-gradient(135deg, #ffb3d9, #ff7ab8);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(255,122,184,0.35);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+      white-space: nowrap;
+    }
+
+    .input-area button:disabled {
+      opacity: 0.5;
+      box-shadow: none;
+      cursor: default;
+    }
+
+    .input-area button:not(:disabled):active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 4px rgba(255,122,184,0.3);
+    }
+  </style>
 </head>
 <body>
-  <h1>チャットページ</h1>
-  <p>ここに追記</p>
+
+  <header>
+    <button class="back" onclick="goHome()">←</button>
+    <div>
+      <h1>INEK Chat</h1>
+      <div class="sub">つながる、関わる、続ける。</div>
+    </div>
+  </header>
+
+  <main class="chat-wrapper">
+    <div id="messages" class="messages">
+      <div class="empty-hint">まだメッセージはありません。<br>下の入力欄から話しかけてみてね。</div>
+    </div>
+
+    <div class="input-area">
+      <input
+        id="messageInput"
+        type="text"
+        placeholder="メッセージを入力..."
+        autocomplete="off"
+      >
+      <button id="sendBtn" onclick="sendMessage()">送信</button>
+    </div>
+  </main>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    function goHome() {
+      window.location.href = "index.html";
+    }
+
+    function appendMessage(text, who = "me") {
+      const emptyHint = messagesEl.querySelector(".empty-hint");
+      if (emptyHint) emptyHint.remove();
+
+      const row = document.createElement("div");
+      row.className = `message-row ${who}`;
+
+      const bubble = document.createElement("div");
+      bubble.className = `bubble ${who === "me" ? "me" : "other"}`;
+      bubble.textContent = text;
+
+      const meta = document.createElement("div");
+      meta.className = `meta ${who === "me" ? "me" : ""}`;
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      meta.textContent = `${who === "me" ? "あなた" : "INEK" }・${hh}:${mm}`;
+
+      row.appendChild(bubble);
+      row.appendChild(meta);
+      messagesEl.appendChild(row);
+
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      appendMessage(text, "me");
+      inputEl.value = "";
+      inputEl.focus();
+
+      // 仮の返信
+      setTimeout(() => {
+        appendMessage("まだ本物のチャットは未実装だよ。\nこれから一緒に作っていこう。", "other");
+      }, 500);
+    }
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+
 </body>
 </html>
