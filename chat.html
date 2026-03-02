@@ -34,18 +34,21 @@
 
       // 右上に表示
       document.getElementById("userStatus").textContent =
-        `${user.displayName} でログイン中`;
+        `${uid} でログイン中`;
 
       // DB にユーザー情報を保存
       update(ref(db, "users/" + uid), {
-        displayName: user.displayName,
+        displayName: user.displayName || uid,
         email: user.email
       });
+
+      // ログイン後にフレンド一覧を読み込む
+      window.loadFriendList();
     });
 
     // 他の script から使えるように export
     window.firebaseExports = {
-      auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded
+      auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set
     };
   </script>
 
@@ -80,15 +83,14 @@
       cursor: pointer;
     }
 
-    /* 2カラムレイアウト */
     .layout {
       display: flex;
       height: calc(100vh - 56px);
     }
 
-    /* 左：フレンド一覧 */
+    /* 左：フレンド関連 */
     .sidebar {
-      width: 260px;
+      width: 280px;
       background: #ffe3f1;
       border-right: 1px solid #f5c8dd;
       padding: 16px;
@@ -98,14 +100,23 @@
     }
 
     .sidebar h2 {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       color: #ff7ab8;
+      margin-bottom: 4px;
+    }
+
+    .label {
+      font-size: 0.8rem;
+      color: #aa6a8f;
+      margin-bottom: 4px;
     }
 
     .search {
       padding: 8px 10px;
       border-radius: 8px;
       border: 1px solid #ffb6d9;
+      font-size: 0.9rem;
+      width: 100%;
     }
 
     .friend-list {
@@ -119,6 +130,7 @@
       border-radius: 8px;
       margin-bottom: 8px;
       cursor: pointer;
+      font-size: 0.9rem;
     }
 
     .friend:hover {
@@ -132,6 +144,12 @@
       flex-direction: column;
       padding: 12px;
       gap: 8px;
+    }
+
+    .chat-header {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 4px;
     }
 
     .messages {
@@ -171,6 +189,7 @@
       padding: 10px 12px;
       border-radius: 999px;
       border: 1px solid #e3c7d7;
+      font-size: 0.9rem;
     }
 
     .input-area button {
@@ -180,6 +199,13 @@
       background: #ff7ab8;
       color: #fff;
       font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .input-area button:disabled {
+      opacity: 0.5;
+      cursor: default;
     }
   </style>
 </head>
@@ -190,129 +216,195 @@
     <button class="back" onclick="goHome()">←</button>
     <div>
       <h1>INEK Chat</h1>
-      <div class="sub">つながる、関わる、続ける。</div>
+      <div class="sub" style="font-size:0.8rem;">つながる、関わる、続ける。</div>
     </div>
     <div id="userStatus" style="margin-left:auto; font-size:0.8rem;"></div>
   </header>
 
   <main class="layout">
 
-    <!-- 左：フレンド一覧 -->
+    <!-- 左：フレンド関連 -->
     <aside class="sidebar">
-      <h2>フレンド一覧</h2>
 
-      <input id="friendSearch" class="search" placeholder="フレンド検索…">
+      <!-- フレンド申請（まだフレンドじゃない人） -->
+      <div>
+        <h2>フレンド申請</h2>
+        <div class="label">まだフレンドじゃない人を検索して申請</div>
+        <input id="requestSearch" class="search" placeholder="@ID を入力…">
+        <div id="requestResults" class="friend-list"></div>
+      </div>
 
-      <div id="searchResults" class="friend-list"></div>
+      <!-- フレンド検索（すでにフレンド） -->
+      <div style="margin-top:12px;">
+        <h2>フレンド検索</h2>
+        <div class="label">今フレンドの中から探す</div>
+        <input id="friendSearch" class="search" placeholder="フレンドを検索…">
+        <div id="friendList" class="friend-list"></div>
+      </div>
 
-      <h2 style="margin-top:10px;">あなたのフレンド</h2>
-      <div id="friendList" class="friend-list"></div>
     </aside>
 
     <!-- 右：チャット画面 -->
     <section class="chat-area">
+      <div id="chatWith" class="chat-header">相手を選択してください</div>
       <div id="messages" class="messages"></div>
 
       <div class="input-area">
-        <input id="messageInput" placeholder="メッセージを入力…">
-        <button onclick="sendMessage()">送信</button>
+        <input id="messageInput" placeholder="メッセージを入力…" disabled>
+        <button id="sendButton" onclick="sendMessage()" disabled>送信</button>
       </div>
     </section>
 
   </main>
 
-  <!-- フレンド検索・チャット処理 -->
+  <!-- フレンド申請・フレンド検索・チャット処理 -->
   <script>
-    const { auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded } =
-      window.firebaseExports;
+    const {
+      auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set
+    } = window.firebaseExports;
 
     let currentRoomId = null;
+    let currentFriendId = null;
 
     function goHome() {
       window.location.href = "index.html";
     }
 
-    // フレンド検索
-    document.getElementById("friendSearch").addEventListener("input", async (e) => {
-      const keyword = e.target.value.replace("@", "");
-      if (!keyword) return;
+    // -----------------------------
+    // フレンド申請（まだフレンドじゃない人）
+    // -----------------------------
+    document.getElementById("requestSearch").addEventListener("input", async (e) => {
+      const raw = e.target.value.trim();
+      const keyword = raw.replace("@", "");
+      const box = document.getElementById("requestResults");
+      box.innerHTML = "";
 
-      const snap = await get(ref(db, "users"));
+      if (!keyword) return;
+      if (!auth.currentUser) return;
+
+      const me = getUserIdFromEmail(auth.currentUser.email);
+
+      const [usersSnap, friendsSnap] = await Promise.all([
+        get(ref(db, "users")),
+        get(ref(db, `users/${me}/friends`))
+      ]);
+
+      const myFriends = friendsSnap.exists() ? friendsSnap.val() : {};
       const results = [];
 
-      snap.forEach(child => {
+      usersSnap.forEach(child => {
         const uid = child.key;
+
+        // 自分は除外
+        if (uid === me) return;
+        // すでにフレンドも除外
+        if (myFriends[uid]) return;
+        // キーワード一致
         if (uid.includes(keyword)) results.push(uid);
       });
 
-      displaySearchResults(results);
-    });
+      if (results.length === 0) {
+        const div = document.createElement("div");
+        div.style.fontSize = "0.8rem";
+        div.style.color = "#777";
+        div.textContent = "該当するユーザーがいません。";
+        box.appendChild(div);
+        return;
+      }
 
-    function displaySearchResults(list) {
-      const box = document.getElementById("searchResults");
-      box.innerHTML = "";
-
-      list.forEach(uid => {
+      results.forEach(uid => {
         const div = document.createElement("div");
         div.className = "friend";
-        div.textContent = uid;
+        div.textContent = uid + " にフレンド申請";
         div.onclick = () => addFriend(uid);
         box.appendChild(div);
       });
-    }
+    });
 
-    // フレンド追加
+    // フレンド追加（即フレンドになる簡易版）
     async function addFriend(friendId) {
+      if (!auth.currentUser) return;
       const me = getUserIdFromEmail(auth.currentUser.email);
 
       await update(ref(db, `users/${me}/friends`), {
         [friendId]: true
       });
+      await update(ref(db, `users/${friendId}/friends`), {
+        [me]: true
+      });
 
-      alert(`${friendId} をフレンドに追加しました！`);
+      alert(`${friendId} とフレンドになりました！`);
+      document.getElementById("requestResults").innerHTML = "";
+      document.getElementById("requestSearch").value = "";
       loadFriendList();
     }
 
-    // フレンド一覧読み込み
-    async function loadFriendList() {
+    // -----------------------------
+    // フレンド検索（すでにフレンド）
+    // -----------------------------
+    async function loadFriendList(filter = "") {
+      if (!auth.currentUser) return;
       const me = getUserIdFromEmail(auth.currentUser.email);
       const snap = await get(ref(db, `users/${me}/friends`));
 
       const box = document.getElementById("friendList");
       box.innerHTML = "";
 
-      if (!snap.exists()) return;
+      if (!snap.exists()) {
+        const div = document.createElement("div");
+        div.style.fontSize = "0.8rem";
+        div.style.color = "#777";
+        div.textContent = "フレンドがいません。フレンド申請から追加してみましょう。";
+        box.appendChild(div);
+        return;
+      }
 
       const friends = snap.val();
-      Object.keys(friends).forEach(uid => {
-        const div = document.createElement("div");
-        div.className = "friend";
-        div.textContent = uid;
-        div.onclick = () => openChatWith(uid);
-        box.appendChild(div);
-      });
+      Object.keys(friends)
+        .filter(uid => uid.includes(filter))
+        .forEach(uid => {
+          const div = document.createElement("div");
+          div.className = "friend";
+          div.textContent = uid;
+          div.onclick = () => openChatWith(uid);
+          box.appendChild(div);
+        });
     }
 
-    // チャットルームを開く
+    document.getElementById("friendSearch").addEventListener("input", (e) => {
+      const keyword = e.target.value.trim();
+      loadFriendList(keyword);
+    });
+
+    // -----------------------------
+    // チャット
+    // -----------------------------
     function openChatWith(friendId) {
+      if (!auth.currentUser) return;
       const me = getUserIdFromEmail(auth.currentUser.email);
+      currentFriendId = friendId;
       currentRoomId = [me, friendId].sort().join("_");
 
+      document.getElementById("chatWith").textContent = `${friendId} とのチャット`;
       document.getElementById("messages").innerHTML = "";
+
+      document.getElementById("messageInput").disabled = false;
+      document.getElementById("sendButton").disabled = false;
+
       loadMessages(currentRoomId);
     }
 
-    // メッセージ受信
     function loadMessages(roomId) {
       const messagesRef = ref(db, `rooms/${roomId}/messages`);
 
+      // 追加されたメッセージをリアルタイムで受信
       onChildAdded(messagesRef, (snap) => {
         const msg = snap.val();
-        appendMessage(msg.text, msg.sender === getUserIdFromEmail(auth.currentUser.email) ? "me" : "other");
+        const me = getUserIdFromEmail(auth.currentUser.email);
+        appendMessage(msg.text, msg.sender === me ? "me" : "other");
       });
     }
 
-    // メッセージ表示
     function appendMessage(text, who) {
       const box = document.getElementById("messages");
 
@@ -329,10 +421,10 @@
       box.scrollTop = box.scrollHeight;
     }
 
-    // メッセージ送信
     async function sendMessage() {
-      const text = document.getElementById("messageInput").value.trim();
-      if (!text || !currentRoomId) return;
+      const input = document.getElementById("messageInput");
+      const text = input.value.trim();
+      if (!text || !currentRoomId || !auth.currentUser) return;
 
       const me = getUserIdFromEmail(auth.currentUser.email);
 
@@ -343,11 +435,11 @@
         timestamp: Date.now()
       });
 
-      document.getElementById("messageInput").value = "";
+      input.value = "";
     }
 
-    // 初期化
-    setTimeout(loadFriendList, 1000);
+    // グローバルから呼べるように
+    window.loadFriendList = loadFriendList;
   </script>
 
 </body>
