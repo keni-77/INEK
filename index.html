@@ -40,10 +40,11 @@
       color: white;
     }
 
-    .signup {
+    .logout {
       background: white;
       border: 2px solid #ff9ecb;
       color: #ff7ab8;
+      display: none;
     }
 
     #status {
@@ -58,54 +59,58 @@
   <h1>INEK</h1>
   <p>つながる、関わる、続ける。</p>
 
-  <!-- 別タブで開く -->
-  <button class="btn login" onclick="window.open('login.html', '_blank')">ログイン</button>
-  <button class="btn logout" onclick="logout()" style="display:none;">ログアウト</button>
+  <!-- ログインボタン -->
+  <button class="btn login" onclick="googleLogin()">Googleでログイン</button>
+
+  <!-- ログアウトボタン（最初は非表示） -->
+  <button class="btn logout" onclick="logout()">ログアウト</button>
 
   <div id="status"></div>
 
   <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
-import { firebaseConfig } from "./firebaseConfig.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } 
+      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+    import { firebaseConfig } from "./firebaseConfig.js";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
 
-onAuthStateChanged(auth, user => {
-  const statusEl = document.getElementById("status");
-  const loginBtn = document.querySelector(".login");
-  const logoutBtn = document.querySelector(".logout");
+    // Googleログイン
+    window.googleLogin = function () {
+      signInWithPopup(auth, provider)
+        .catch(err => {
+          console.error(err);
+          alert("ログインに失敗しました: " + err.message);
+        });
+    };
 
-  if (user) {
-    statusEl.textContent = `${user.displayName} でログイン中`;
+    // ログアウト
+    window.logout = function () {
+      signOut(auth)
+        .catch(err => {
+          console.error(err);
+          alert("ログアウトに失敗しました: " + err.message);
+        });
+    };
 
-    // ログインしたらログインボタンを消す
-    loginBtn.style.display = "none";
+    // ログイン状態の監視
+    onAuthStateChanged(auth, user => {
+      const statusEl = document.getElementById("status");
+      const loginBtn = document.querySelector(".login");
+      const logoutBtn = document.querySelector(".logout");
 
-    // ログアウトボタンを表示
-    logoutBtn.style.display = "block";
-
-  } else {
-    statusEl.textContent = "";
-
-    // ログインしていない時はログインボタンを表示
-    loginBtn.style.display = "block";
-
-    // ログアウトボタンを消す
-    logoutBtn.style.display = "none";
-  }
-});
-
-// ログアウト処理
-window.logout = function () {
-  signOut(auth)
-    .catch(err => {
-      console.error(err);
-      alert("ログアウトに失敗しました: " + err.message);
+      if (user) {
+        statusEl.textContent = `${user.displayName} でログイン中`;
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "block";
+      } else {
+        statusEl.textContent = "";
+        loginBtn.style.display = "block";
+        logoutBtn.style.display = "none";
+      }
     });
-};
-
   </script>
 
 </body>
