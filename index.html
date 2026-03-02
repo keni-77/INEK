@@ -45,6 +45,12 @@
       border: 2px solid #ff9ecb;
       color: #ff7ab8;
     }
+
+    #status {
+      margin-top: 30px;
+      font-size: 0.95rem;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -52,22 +58,26 @@
   <h1>INEK</h1>
   <p>つながる、関わる、続ける。</p>
 
+  <!-- 別タブで開く -->
   <button class="btn login" onclick="window.open('login.html', '_blank')">ログイン</button>
   <button class="btn signup" onclick="window.open('signup.html', '_blank')">新規登録</button>
 
   <div id="status"></div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
     import { firebaseConfig } from "./firebaseConfig.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
     onAuthStateChanged(auth, user => {
+      const statusEl = document.getElementById("status");
       if (user) {
-        document.getElementById("status").textContent = `${user.email} でログイン中`;
+        statusEl.textContent = `${user.email} でログイン中`;
+      } else {
+        statusEl.textContent = "";
       }
     });
   </script>
