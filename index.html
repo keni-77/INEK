@@ -75,7 +75,7 @@
     onAuthStateChanged(auth, user => {
       const statusEl = document.getElementById("status");
       if (user) {
-        statusEl.textContent = `${user.email} でログイン中`;
+        statusEl.textContent = `${user.displayName} でログイン中`;
       } else {
         statusEl.textContent = "";
       }
