@@ -52,8 +52,25 @@
   <h1>INEK</h1>
   <p>つながる、関わる、続ける。</p>
 
-  <button class="btn login" onclick="location.href='login.html'">ログイン</button>
-  <button class="btn signup" onclick="location.href='signup.html'">新規登録</button>
+  <button onclick="window.open('login.html', '_blank')">ログイン</button>
+  <button onclick="window.open('signup.html', '_blank')">新規登録</button>
+
+<div id="status"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+  import { firebaseConfig } from "./firebaseConfig.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      document.getElementById("status").textContent = `${user.email} でログイン中`;
+    }
+  });
+</script>
 
 </body>
 </html>
