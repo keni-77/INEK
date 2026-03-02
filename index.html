@@ -47,6 +47,24 @@
       display: none;
     }
 
+    .chat {
+      background: linear-gradient(135deg, #ffb3d9, #ff7ab8);
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(255, 122, 184, 0.3);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .chat:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 14px rgba(255, 122, 184, 0.4);
+    }
+
+    .chat:active {
+    transform: translateY(0);
+      box-shadow: 0 3px 8px rgba(255, 122, 184, 0.3);
+    }
+
     #status {
       margin-top: 30px;
       font-size: 0.95rem;
@@ -106,8 +124,8 @@
     onAuthStateChanged(auth, user => {
       const statusEl = document.getElementById("status");
       const loginBtn = document.querySelector(".login");
-      const logoutBtn = document.querySelector(".logout");
       const chatBtn = document.querySelector(".chat");
+      const logoutBtn = document.querySelector(".logout");
 
       if (user) {
         statusEl.textContent = `${user.displayName} でログイン中`;
