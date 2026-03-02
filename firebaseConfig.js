@@ -1,6 +1,7 @@
 export const firebaseConfig = {
   apiKey: "AIzaSyAunhc9qhWqEFxd-LeQ7cDx_7RLl2zT3ak",
   authDomain: "inek-cb023.firebaseapp.com",
+  databaseURL: "https://inek-cb023-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "inek-cb023",
   storageBucket: "inek-cb023.firebasestorage.app",
   messagingSenderId: "546771892360",
