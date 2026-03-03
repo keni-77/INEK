@@ -269,8 +269,9 @@ onAuthStateChanged(auth, user => {
 
   const me = getUserIdFromEmail(user.email);
 
-  let currentRoomId = null;
-  let currentFriendId = null;
+  // ============================
+  // ここから下にチャット処理全部入れる
+  // ============================
 
   document.getElementById("requestSearch").addEventListener("input", async (e) => {
     const raw = e.target.value.trim();
@@ -354,8 +355,7 @@ onAuthStateChanged(auth, user => {
   });
 
   function openChatWith(friendId) {
-    currentFriendId = friendId;
-    currentRoomId = [me, friendId].sort().join("_");
+    const roomId = [me, friendId].sort().join("_");
 
     document.getElementById("chatWith").textContent = `${friendId} とのチャット`;
     document.getElementById("messages").innerHTML = "";
@@ -363,7 +363,7 @@ onAuthStateChanged(auth, user => {
     document.getElementById("messageInput").disabled = false;
     document.getElementById("sendButton").disabled = false;
 
-    loadMessages(currentRoomId);
+    loadMessages(roomId);
   }
 
   function loadMessages(roomId) {
@@ -390,12 +390,15 @@ onAuthStateChanged(auth, user => {
     box.scrollTop = box.scrollHeight;
   }
 
-  async function sendMessage() {
+  document.getElementById("sendButton").addEventListener("click", async () => {
     const input = document.getElementById("messageInput");
     const text = input.value.trim();
-    if (!text || !currentRoomId) return;
+    if (!text) return;
 
-    const msgRef = push(ref(db, `rooms/${currentRoomId}/messages`));
+    const friendId = document.getElementById("chatWith").textContent.replace(" とのチャット", "");
+    const roomId = [me, friendId].sort().join("_");
+
+    const msgRef = push(ref(db, `rooms/${roomId}/messages`));
     await set(msgRef, {
       sender: me,
       text,
@@ -403,12 +406,13 @@ onAuthStateChanged(auth, user => {
     });
 
     input.value = "";
-  }
+  });
 
-  window.loadFriendList = loadFriendList;
+  // 初回読み込み
   loadFriendList();
 });
 </script>
+
 
 
 
