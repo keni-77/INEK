@@ -6,50 +6,48 @@
   <link rel="icon" href="favicon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Firebase 初期化（Auth + RealtimeDB） -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
-    import { getDatabase, ref, set, update, get, push, onChildAdded }
-      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
-    import { firebaseConfig } from "./firebaseConfig.js";
+<!-- Firebase 初期化（Auth + RealtimeDB） -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+  import { getDatabase, ref, set, update, get, push, onChildAdded }
+    from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+  import { firebaseConfig } from "./firebaseConfig.js";
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
 
-    // メール → @ID
-    function getUserIdFromEmail(email) {
-      return "@" + email.split("@")[0];
+  // メール → @ID
+  function getUserIdFromEmail(email) {
+    return "@" + email.split("@")[0];
+  }
+
+  // ログインチェック & ユーザー登録
+  onAuthStateChanged(auth, user => {
+    if (!user) {
+      window.location.href = "index.html";
+      return;
     }
 
-    // ログインチェック & ユーザー登録
-    onAuthStateChanged(auth, user => {
-      if (!user) {
-        window.location.href = "index.html";
-        return;
-      }
+    const uid = getUserIdFromEmail(user.email);
 
-      const uid = getUserIdFromEmail(user.email);
+    document.getElementById("userStatus").textContent =
+      `${uid} でログイン中`;
 
-      // 右上に表示
-      document.getElementById("userStatus").textContent =
-        `${uid} でログイン中`;
-
-      // DB にユーザー情報を保存
-      update(ref(db, "users/" + uid), {
-        displayName: user.displayName || uid,
-        email: user.email
-      });
-
-      // ログイン後にフレンド一覧を読み込む
-      window.loadFriendList();
+    update(ref(db, "users/" + uid), {
+      displayName: user.displayName || uid,
+      email: user.email
     });
 
-    // 他の script から使えるように export
-    window.firebaseExports = {
-      auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set
-    };
+    // ログイン後にフレンド一覧を読み込む
+    if (window.loadFriendList) window.loadFriendList();
+  });
+
+  // 他の script から使えるように export
+  window.firebase = {
+    auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set
+  };
   </script>
 
   <style>
@@ -259,9 +257,8 @@
 
   <!-- フレンド申請・フレンド検索・チャット処理 -->
   <script>
-    const {
-      auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set
-    } = window.firebaseExports;
+    const { auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set } =
+      window.firebase;
 
     let currentRoomId = null;
     let currentFriendId = null;
