@@ -255,189 +255,175 @@
 
   </main>
 
-  <!-- フレンド申請・フレンド検索・チャット処理 -->
-  <script type="module">
-    const { auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set } =
-      window.firebase;
+<!-- フレンド申請・フレンド検索・チャット処理 -->
+<script type="module">
+window.onload = () => {
+  const { auth, db, getUserIdFromEmail, ref, update, get, push, onChildAdded, set } =
+    window.firebase;
 
-    let currentRoomId = null;
-    let currentFriendId = null;
+  let currentRoomId = null;
+  let currentFriendId = null;
 
-    function goHome() {
-      window.location.href = "index.html";
+  function goHome() {
+    window.location.href = "index.html";
+  }
+
+  document.getElementById("requestSearch").addEventListener("input", async (e) => {
+    const raw = e.target.value.trim();
+    const keyword = raw.replace("@", "");
+    const box = document.getElementById("requestResults");
+    box.innerHTML = "";
+
+    if (!keyword) return;
+    if (!auth.currentUser) return;
+
+    const me = getUserIdFromEmail(auth.currentUser.email);
+
+    const [usersSnap, friendsSnap] = await Promise.all([
+      get(ref(db, "users")),
+      get(ref(db, `users/${me}/friends`))
+    ]);
+
+    const myFriends = friendsSnap.exists() ? friendsSnap.val() : {};
+    const results = [];
+
+    usersSnap.forEach(child => {
+      const uid = child.key;
+      if (uid === me) return;
+      if (myFriends[uid]) return;
+      if (uid.includes(keyword)) results.push(uid);
+    });
+
+    if (results.length === 0) {
+      const div = document.createElement("div");
+      div.style.fontSize = "0.8rem";
+      div.style.color = "#777";
+      div.textContent = "該当するユーザーがいません。";
+      box.appendChild(div);
+      return;
     }
 
-    // -----------------------------
-    // フレンド申請（まだフレンドじゃない人）
-    // -----------------------------
-    document.getElementById("requestSearch").addEventListener("input", async (e) => {
-      const raw = e.target.value.trim();
-      const keyword = raw.replace("@", "");
-      const box = document.getElementById("requestResults");
-      box.innerHTML = "";
+    results.forEach(uid => {
+      const div = document.createElement("div");
+      div.className = "friend";
+      div.textContent = uid + " にフレンド申請";
+      div.onclick = () => addFriend(uid);
+      box.appendChild(div);
+    });
+  });
 
-      if (!keyword) return;
-      if (!auth.currentUser) return;
+  async function addFriend(friendId) {
+    if (!auth.currentUser) return;
+    const me = getUserIdFromEmail(auth.currentUser.email);
 
-      const me = getUserIdFromEmail(auth.currentUser.email);
+    await update(ref(db, `users/${me}/friends`), {
+      [friendId]: true
+    });
+    await update(ref(db, `users/${friendId}/friends`), {
+      [me]: true
+    });
 
-      const [usersSnap, friendsSnap] = await Promise.all([
-        get(ref(db, "users")),
-        get(ref(db, `users/${me}/friends`))
-      ]);
+    alert(`${friendId} とフレンドになりました！`);
+    document.getElementById("requestResults").innerHTML = "";
+    document.getElementById("requestSearch").value = "";
+    loadFriendList();
+  }
 
-      const myFriends = friendsSnap.exists() ? friendsSnap.val() : {};
-      const results = [];
+  async function loadFriendList(filter = "") {
+    if (!auth.currentUser) return;
+    const me = getUserIdFromEmail(auth.currentUser.email);
+    const snap = await get(ref(db, `users/${me}/friends`));
 
-      usersSnap.forEach(child => {
-        const uid = child.key;
+    const box = document.getElementById("friendList");
+    box.innerHTML = "";
 
-        // 自分は除外
-        if (uid === me) return;
-        // すでにフレンドも除外
-        if (myFriends[uid]) return;
-        // キーワード一致
-        if (uid.includes(keyword)) results.push(uid);
-      });
+    if (!snap.exists()) {
+      const div = document.createElement("div");
+      div.style.fontSize = "0.8rem";
+      div.style.color = "#777";
+      div.textContent = "フレンドがいません。フレンド申請から追加してみましょう。";
+      box.appendChild(div);
+      return;
+    }
 
-      if (results.length === 0) {
-        const div = document.createElement("div");
-        div.style.fontSize = "0.8rem";
-        div.style.color = "#777";
-        div.textContent = "該当するユーザーがいません。";
-        box.appendChild(div);
-        return;
-      }
-
-      results.forEach(uid => {
+    const friends = snap.val();
+    Object.keys(friends)
+      .filter(uid => uid.includes(filter))
+      .forEach(uid => {
         const div = document.createElement("div");
         div.className = "friend";
-        div.textContent = uid + " にフレンド申請";
-        div.onclick = () => addFriend(uid);
+        div.textContent = uid;
+        div.onclick = () => openChatWith(uid);
         box.appendChild(div);
       });
+  }
+
+  document.getElementById("friendSearch").addEventListener("input", (e) => {
+    const keyword = e.target.value.trim();
+    loadFriendList(keyword);
+  });
+
+  function openChatWith(friendId) {
+    if (!auth.currentUser) return;
+    const me = getUserIdFromEmail(auth.currentUser.email);
+    currentFriendId = friendId;
+    currentRoomId = [me, friendId].sort().join("_");
+
+    document.getElementById("chatWith").textContent = `${friendId} とのチャット`;
+    document.getElementById("messages").innerHTML = "";
+
+    document.getElementById("messageInput").disabled = false;
+    document.getElementById("sendButton").disabled = false;
+
+    loadMessages(currentRoomId);
+  }
+
+  function loadMessages(roomId) {
+    const messagesRef = ref(db, `rooms/${roomId}/messages`);
+    onChildAdded(messagesRef, (snap) => {
+      const msg = snap.val();
+      const me = getUserIdFromEmail(auth.currentUser.email);
+      appendMessage(msg.text, msg.sender === me ? "me" : "other");
+    });
+  }
+
+  function appendMessage(text, who) {
+    const box = document.getElementById("messages");
+
+    const row = document.createElement("div");
+    row.className = `message-row ${who}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = `bubble ${who}`;
+    bubble.textContent = text;
+
+    row.appendChild(bubble);
+    box.appendChild(row);
+
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById("messageInput");
+    const text = input.value.trim();
+    if (!text || !currentRoomId || !auth.currentUser) return;
+
+    const me = getUserIdFromEmail(auth.currentUser.email);
+
+    const msgRef = push(ref(db, `rooms/${currentRoomId}/messages`));
+    await set(msgRef, {
+      sender: me,
+      text,
+      timestamp: Date.now()
     });
 
-    // フレンド追加（即フレンドになる簡易版）
-    async function addFriend(friendId) {
-      if (!auth.currentUser) return;
-      const me = getUserIdFromEmail(auth.currentUser.email);
+    input.value = "";
+  }
 
-      await update(ref(db, `users/${me}/friends`), {
-        [friendId]: true
-      });
-      await update(ref(db, `users/${friendId}/friends`), {
-        [me]: true
-      });
+  window.loadFriendList = loadFriendList;
+};
+</script>
 
-      alert(`${friendId} とフレンドになりました！`);
-      document.getElementById("requestResults").innerHTML = "";
-      document.getElementById("requestSearch").value = "";
-      loadFriendList();
-    }
-
-    // -----------------------------
-    // フレンド検索（すでにフレンド）
-    // -----------------------------
-    async function loadFriendList(filter = "") {
-      if (!auth.currentUser) return;
-      const me = getUserIdFromEmail(auth.currentUser.email);
-      const snap = await get(ref(db, `users/${me}/friends`));
-
-      const box = document.getElementById("friendList");
-      box.innerHTML = "";
-
-      if (!snap.exists()) {
-        const div = document.createElement("div");
-        div.style.fontSize = "0.8rem";
-        div.style.color = "#777";
-        div.textContent = "フレンドがいません。フレンド申請から追加してみましょう。";
-        box.appendChild(div);
-        return;
-      }
-
-      const friends = snap.val();
-      Object.keys(friends)
-        .filter(uid => uid.includes(filter))
-        .forEach(uid => {
-          const div = document.createElement("div");
-          div.className = "friend";
-          div.textContent = uid;
-          div.onclick = () => openChatWith(uid);
-          box.appendChild(div);
-        });
-    }
-
-    document.getElementById("friendSearch").addEventListener("input", (e) => {
-      const keyword = e.target.value.trim();
-      loadFriendList(keyword);
-    });
-
-    // -----------------------------
-    // チャット
-    // -----------------------------
-    function openChatWith(friendId) {
-      if (!auth.currentUser) return;
-      const me = getUserIdFromEmail(auth.currentUser.email);
-      currentFriendId = friendId;
-      currentRoomId = [me, friendId].sort().join("_");
-
-      document.getElementById("chatWith").textContent = `${friendId} とのチャット`;
-      document.getElementById("messages").innerHTML = "";
-
-      document.getElementById("messageInput").disabled = false;
-      document.getElementById("sendButton").disabled = false;
-
-      loadMessages(currentRoomId);
-    }
-
-    function loadMessages(roomId) {
-      const messagesRef = ref(db, `rooms/${roomId}/messages`);
-
-      // 追加されたメッセージをリアルタイムで受信
-      onChildAdded(messagesRef, (snap) => {
-        const msg = snap.val();
-        const me = getUserIdFromEmail(auth.currentUser.email);
-        appendMessage(msg.text, msg.sender === me ? "me" : "other");
-      });
-    }
-
-    function appendMessage(text, who) {
-      const box = document.getElementById("messages");
-
-      const row = document.createElement("div");
-      row.className = `message-row ${who}`;
-
-      const bubble = document.createElement("div");
-      bubble.className = `bubble ${who}`;
-      bubble.textContent = text;
-
-      row.appendChild(bubble);
-      box.appendChild(row);
-
-      box.scrollTop = box.scrollHeight;
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById("messageInput");
-      const text = input.value.trim();
-      if (!text || !currentRoomId || !auth.currentUser) return;
-
-      const me = getUserIdFromEmail(auth.currentUser.email);
-
-      const msgRef = push(ref(db, `rooms/${currentRoomId}/messages`));
-      await set(msgRef, {
-        sender: me,
-        text,
-        timestamp: Date.now()
-      });
-
-      input.value = "";
-    }
-
-    // グローバルから呼べるように
-    window.loadFriendList = loadFriendList;
-  </script>
 
 </body>
 </html>
